@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import wordninja
 import os
+import argparse
 
 DEPOSIT_TRIGS = ['Deposit', 'MB-Transferfrom']
 
@@ -99,7 +100,29 @@ def process_all_pdfs_in_directory(directory_path):
     return all_transactions
 
 if __name__ == "__main__":
-    # Directory containing the PDF files
-    directory_path = "data/statements"
-    consolidated_transactions_df = process_all_pdfs_in_directory(directory_path)
-consolidated_transactions_df
+
+    parser = argparse.ArgumentParser(description='Extract transactions from PDF bank statements.')
+    parser.add_argument(
+        '-i','--input',
+        type=str,
+        default='data/raw',
+        help='Input folder containing PDF files'
+    )
+
+    parser.add_argument(
+        '-o','--output',
+        type=str,
+        default='data/processed',
+        help='Output folder to store extracted transactions'
+    )
+
+    args = parser.parse_args()
+    os.makedirs(args.output, exist_ok=True)
+
+    print(f"Processing PDFs in {args.input}")
+    transactions_df = process_all_pdfs_in_directory(args.input)
+
+    output_csv_path = os.path.join(args.output, 'transactions.csv')
+    print(f"Saving extracted transactions to {output_csv_path}")
+    transactions_df.to_csv(output_csv_path, index=False)
+    print(f"Exported transactions to: {output_csv_path}")
