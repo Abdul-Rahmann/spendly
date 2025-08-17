@@ -193,7 +193,7 @@ class DataProcessor:
 if __name__ == "__main__":
     processor = DataProcessor()
     input_directory = "../data/raw"
-    output_csv = "data/processed/transactions.csv"
+    output_csv = "../data/processed/transactions.csv"
 
     if os.path.exists(input_directory):
         print(f"Processing PDFs from directory: {input_directory}")
