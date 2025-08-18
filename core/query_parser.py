@@ -1,5 +1,6 @@
 import pandas as pd
 from datetime import datetime, timedelta
+import re
 
 class TransactionQueryParser:
     def __init__(self, df):
@@ -9,7 +10,36 @@ class TransactionQueryParser:
         self.df['withdrawals'] = self.df['withdrawals'].astype(float)
         print('Transaction Dataframe loaded successfully!')
 
+    @staticmethod
+    def parse_relative_dates(relative_date):
+        today = datetime.now()
+
+        if re.match('last week', relative_date, re.IGNORECASE):
+            start_date = today - timedelta(days=7)
+            end_date =  start_date + timedelta(days=6)
+        elif re.match('this month', relative_date, re.IGNORECASE):
+            start_date = today - timedelta(days=today.weekday())
+            end_date = today
+        elif re.match('last month', relative_date, re.IGNORECASE):
+            first_day_this_month = today.replace(day=1)
+            end_date = first_day_this_month - timedelta(days=1)
+            start_date = end_date - timedelta(days=30)
+        elif re.match('this month', relative_date, re.IGNORECASE):
+            start_date = today.replace(day=1)
+            end_date = today
+        elif re.match('last year', relative_date, re.IGNORECASE):
+            start_date = today.replace(month=1, day=1)
+            end_date = today
+        else:
+            raise ValueError(f"Invalid relative date: {relative_date}")
+
+        return start_date.strftime('%Y-%m-%d'), end_date.strftime('%Y-%m-%d')
+
     def filter_by_date(self, start_date=None, end_date=None):
+
+        if start_date and isinstance(start_date, str) and " " in start_date:
+            start_date, end_date = self.parse_relative_dates(start_date)
+
         df_filtered = self.df
 
         if start_date:
@@ -19,16 +49,17 @@ class TransactionQueryParser:
         print(f"Filtered {len(df_filtered)} rows between {start_date} and {end_date}.")
         return df_filtered
 
-    def filter_by_description(self, keyword):
-        df_filtered = self.df[self.df['description'].str.contains(keyword, case=False, na=False)]
-        print(f"Found {len(df_filtered)} rows matching keyword: '{keyword}'.")
+    def filter_by_description(self, keywords):
+        if isinstance(keywords, str):
+            keywords = [keywords]
+
+        pattern = '|'.join(re.escape(keyword) for keyword in keywords)
+        df_filtered = self.df[self.df['description'].str.contains(pattern, case=False, na=False)]
+        # df_filtered = self.df[self.df['description'].str.contains(keyword, case=False, na=False)]
+        print(f"Found {len(df_filtered)} rows matching keywords: {keywords}.")
         return df_filtered
 
     def get_total_amount(self, transaction_type='withdrawals', start_date=None, end_date=None):
-        valid_transaction_types = ['withdrawals', 'deposits']
-        if transaction_type not in valid_transaction_types:
-            raise ValueError(f"Invalid transaction type. Choose from: {valid_transaction_types}")
-
         df_filtered = self.filter_by_date(start_date, end_date)
         total = df_filtered[transaction_type].sum()
         print(f"Total {transaction_type} between {start_date} and {end_date}: ${total:.2f}")
@@ -74,6 +105,19 @@ if __name__ == "__main__":
     print(largest_deposit)
 
     print("\n--- Groceries Transactions ---")
-    groceries = query_parser.filter_by_description(keyword='groceries')
+    groceries = query_parser.filter_by_description(keywords='groceries')
     print(groceries)
+
+    # Sample Query Execution
+    print("\n--- Total Withdrawals Last Month ---")
+    query_parser.get_total_amount(transaction_type='withdrawals', start_date="last month")
+
+    print("\n--- Groceries Transactions ---")
+    groceries = query_parser.filter_by_description(keywords=["groceries", "walmart"])
+    print(groceries)
+
+    print("\n--- Largest Deposit ---")
+    largest_deposit = query_parser.get_largest_transaction(transaction_type='deposits')
+    print(largest_deposit)
+
 
