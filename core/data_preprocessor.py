@@ -160,7 +160,71 @@ class DataProcessor:
         df['year'] = df['date'].dt.year
         df['day_of_week'] = df['date'].dt.dayofweek
 
-        print(f"Preprocessed DataFrame – {len(df)} valid transactions.")
+
+        def categorize_transaction(description):
+            description = description.lower()
+            if any(keyword in description for keyword in
+                   ["chitchat super", "no frills", "walmart", "dollarama", "african super"]):
+                return "Groceries"
+            elif any(keyword in description for keyword in
+                     ["subway", "tim hortons", "cineplex", "granville island", "ocean garden", "shipyards chris"]):
+                return "Restaurants/Dining"
+            elif any(keyword in description for keyword in ["golds gym", "ubc gym","gym"]):
+                return "Fitness"
+            elif any(keyword in description for keyword in
+                     ["canadian tire", "amazon", "london drugs", "footlocker", "kindle","temu"]):
+                return "Shopping"
+            elif any(keyword in description for keyword in
+                     ["cineplex", "compass web", "netflix", "amazon prime"]):
+                return "Entertainment"
+            elif any(keyword in description for keyword in
+                     ["driver services", "tennis vancouver", "compass web", "revenue services"]):
+                return "Transportation"
+            elif any(keyword in description for keyword in
+                     ["tuition", "ubc botanical", "campus vision", "education ref", "ubc enrolment"]):
+                return "Education"
+            elif "error correction" in description:
+                return "Error Corrections"
+            elif any(keyword in description for keyword in ["virgin plus", "heroku charge", "kindle"]):
+                return "Light Subscriptions"
+            elif any(keyword in description for keyword in ["overdrawn handling", "overdraft interest"]):
+                return "Overdraft/Fees"
+            elif "refund" in description:
+                return "Refunds"
+            elif "mb transfer" in description:
+                return "Transfers"
+            elif description.isnumeric() and float(description) > 1000:  # Example large purchase threshold
+                return "Large Purchases"
+            else:
+                return "Other"
+
+        df['category'] = df['description'].apply(categorize_transaction)
+
+        df['is_recurring'] = df.groupby(['description','month','year'])['description'].transform('count') > 1
+
+        # Add alerts for balance thresholds
+        df['low_balance_alert'] = df['balance'] < 100
+        df['critical_balance_alert'] = df['balance'] < 20
+        df['overdraft_alert'] = df['balance'] < 0
+
+        # Add flags for large transactions
+        df['is_large_withdrawal'] = df['withdrawals'] > 10000
+        df['is_large_deposit'] = df['deposits'] > 10000
+
+        df['month_withdrawals'] = df.groupby(['month','year'])['withdrawals'].transform('sum')
+        df['monthly_deposits'] = df.groupby(['month','year'])['deposits'].transform('sum')
+        df['monthly_start_balance'] = df.groupby(['month','year'])['balance'].transform('first')
+        df['monthly_end_balance'] = df.groupby(['month','year'])['balance'].transform('last')
+        df['monthly_balance_change'] = df['monthly_end_balance'] - df['monthly_start_balance']
+
+        df['seasonal_spending'] = df['month'].isin([11,12]) | df['month'].isin([8,9])
+
+        # Add refund and error correction flags
+        df['is_refund'] = df['description'].str.contains('refund', case=False, na=False)
+        df['is_error_correction'] = df['description'].str.contains('error correction', case=False, na=False)
+
+        print(f"Preprocessed DataFrame – {len(df)} valid transactions with enriched features.")
+
         return df
 
     def process_directory(self, directory_path):
